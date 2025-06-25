@@ -1,8 +1,88 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'dart:convert';
 
 // PUBLIC_INTERFACE
 void main() {
-  runApp(const MyApp());
+  WidgetsFlutterBinding.ensureInitialized();
+  runApp(MyApp());
+}
+
+// ===== Models and Persistence =====
+
+// Quote model
+class Quote {
+  final String text;
+  final String author;
+
+  Quote({required this.text, required this.author});
+
+  // Serialization for storage
+  Map<String, dynamic> toJson() => {'text': text, 'author': author};
+
+  static Quote fromJson(Map<String, dynamic> json) => Quote(
+        text: json['text'],
+        author: json['author'],
+      );
+
+  // Equality for searching and removal
+  @override
+  bool operator ==(Object other) =>
+      other is Quote && text == other.text && author == other.author;
+  @override
+  int get hashCode => text.hashCode ^ author.hashCode;
+}
+
+// Persistence helper using shared_preferences
+class FavoriteRepository {
+  static const _key = 'favorites';
+
+  Future<List<Quote>> loadFavorites() async {
+    final prefs = await SharedPreferences.getInstance();
+    final encoded = prefs.getStringList(_key) ?? [];
+    return encoded
+        .map((e) => Quote.fromJson(json.decode(e)))
+        .toList();
+  }
+
+  Future<void> saveFavorites(List<Quote> favorites) async {
+    final prefs = await SharedPreferences.getInstance();
+    final encoded = favorites.map((q) => json.encode(q.toJson())).toList();
+    await prefs.setStringList(_key, encoded);
+  }
+}
+
+// App state for current quote and favorites
+class AppState extends ChangeNotifier {
+  final FavoriteRepository repo = FavoriteRepository();
+  List<Quote> favorites = [];
+  // In a real app, current quote is fetched from API; for demo, it's static.
+  Quote currentQuote = Quote(
+    text: "Success is not final, failure is not fatal: It is the courage to continue that counts.",
+    author: "Winston Churchill",
+  );
+
+  bool get isCurrentFavorite =>
+      favorites.any((q) => q == currentQuote);
+
+  AppState() {
+    _init();
+  }
+
+  void _init() async {
+    favorites = await repo.loadFavorites();
+    notifyListeners();
+  }
+
+  void toggleFavorite() async {
+    if (isCurrentFavorite) {
+      favorites.removeWhere((q) => q == currentQuote);
+    } else {
+      favorites.add(currentQuote);
+    }
+    await repo.saveFavorites(favorites);
+    notifyListeners();
+  }
 }
 
 // PUBLIC_INTERFACE
@@ -15,6 +95,7 @@ class MyApp extends StatefulWidget {
 
 class _MyAppState extends State<MyApp> {
   ThemeMode _themeMode = ThemeMode.light;
+  final AppState appState = AppState();
 
   void _toggleTheme() {
     setState(() {
@@ -25,6 +106,7 @@ class _MyAppState extends State<MyApp> {
 
   @override
   Widget build(BuildContext context) {
+    // Pass appState to HomeScreen and all descendants that need it
     return MaterialApp(
       title: 'InspireDaily',
       theme: AppThemes.lightTheme,
@@ -33,6 +115,7 @@ class _MyAppState extends State<MyApp> {
       home: HomeScreen(
         onToggleTheme: _toggleTheme,
         themeMode: _themeMode,
+        appState: appState,
       ),
     );
   }
@@ -146,16 +229,37 @@ class AppThemes {
   );
 }
 
-// HomeScreen with toggle for light/dark mode and navigation to Favorites
-class HomeScreen extends StatelessWidget {
+// HomeScreen now takes appState
+class HomeScreen extends StatefulWidget {
   final VoidCallback onToggleTheme;
   final ThemeMode themeMode;
+  final AppState appState;
 
   const HomeScreen({
     super.key,
     required this.onToggleTheme,
     required this.themeMode,
+    required this.appState,
   });
+
+  @override
+  State<HomeScreen> createState() => _HomeScreenState();
+}
+
+class _HomeScreenState extends State<HomeScreen> {
+  @override
+  void initState() {
+    super.initState();
+    widget.appState.addListener(_handleStateChange);
+  }
+
+  void _handleStateChange() => setState(() {});
+
+  @override
+  void dispose() {
+    widget.appState.removeListener(_handleStateChange);
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -181,16 +285,21 @@ class HomeScreen extends StatelessWidget {
             IconButton(
               icon: Icon(isDark ? Icons.light_mode : Icons.dark_mode),
               tooltip: "Toggle theme",
-              onPressed: onToggleTheme,
+              onPressed: widget.onToggleTheme,
             ),
             IconButton(
-              icon: const Icon(Icons.favorite),
+              icon: Icon(
+                Icons.favorite,
+                color: widget.appState.favorites.isNotEmpty
+                    ? Theme.of(context).colorScheme.tertiary
+                    : null,
+              ),
               tooltip: 'Favorites',
               onPressed: () {
                 Navigator.of(context).push(
                   MaterialPageRoute(
                     builder: (_) =>
-                        FavoritesScreen(),
+                        FavoritesScreen(appState: widget.appState),
                   ),
                 );
               },
@@ -203,27 +312,28 @@ class HomeScreen extends StatelessWidget {
         height: double.infinity,
         decoration: BoxDecoration(gradient: backgroundGradient),
         child: Center(
-          child: QuoteCard(isDark: isDark),
+          child: QuoteCard(
+            isDark: isDark,
+            appState: widget.appState,
+          ),
         ),
       ),
     );
   }
 }
 
-// Widget for displaying quote in a gradient card
+// Widget for displaying quote in a gradient card, uses actual appState
 class QuoteCard extends StatelessWidget {
   final bool isDark;
-  const QuoteCard({super.key, required this.isDark});
+  final AppState appState;
+
+  const QuoteCard({super.key, required this.isDark, required this.appState});
 
   @override
   Widget build(BuildContext context) {
     final gradient =
         isDark ? AppThemes.darkCardGradient : AppThemes.lightCardGradient;
-
-    // Mock quote and author (replace with live data in production)
-    const quote =
-        "Success is not final, failure is not fatal: It is the courage to continue that counts.";
-    const author = "Winston Churchill";
+    final quote = appState.currentQuote;
 
     return Container(
       width: MediaQuery.of(context).size.width * 0.88,
@@ -234,8 +344,8 @@ class QuoteCard extends StatelessWidget {
         boxShadow: [
           BoxShadow(
             color: isDark
-                ? Color(0x80000000) // semi-transparent black (~0.5 opacity)
-                : Color(0x4D9E9E9E), // semi-transparent grey (~0.3 opacity)
+                ? Color(0x80000000)
+                : Color(0x4D9E9E9E),
             blurRadius: 18,
             offset: const Offset(0, 8),
           ),
@@ -251,7 +361,7 @@ class QuoteCard extends StatelessWidget {
           ),
           const SizedBox(height: 10),
           Text(
-            quote,
+            quote.text,
             style: Theme.of(context)
                 .textTheme
                 .titleLarge!
@@ -263,7 +373,7 @@ class QuoteCard extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.end,
             children: [
               Text(
-                "- $author",
+                "- ${quote.author}",
                 style: Theme.of(context)
                     .textTheme
                     .bodyMedium!
@@ -276,12 +386,20 @@ class QuoteCard extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.end,
             children: [
               IconButton(
-                icon: Icon(Icons.favorite_border,
-                    color: Theme.of(context).colorScheme.tertiary),
-                tooltip: "Favorite",
+                icon: Icon(
+                  appState.isCurrentFavorite
+                      ? Icons.favorite
+                      : Icons.favorite_border,
+                  color: Theme.of(context).colorScheme.tertiary,
+                ),
+                tooltip: appState.isCurrentFavorite ? "Unfavorite" : "Favorite",
                 onPressed: () {
+                  appState.toggleFavorite();
+                  final msg = appState.isCurrentFavorite
+                      ? "Quote added to favorites!"
+                      : "Quote removed from favorites!";
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text("Quote added to favorites!")),
+                    SnackBar(content: Text(msg)),
                   );
                 },
               ),
@@ -293,9 +411,30 @@ class QuoteCard extends StatelessWidget {
   }
 }
 
-// Favorites screen with themed gradient background
-class FavoritesScreen extends StatelessWidget {
-  const FavoritesScreen({super.key});
+// Favorites screen with themed gradient background, reads from appState
+class FavoritesScreen extends StatefulWidget {
+  final AppState appState;
+
+  const FavoritesScreen({super.key, required this.appState});
+
+  @override
+  State<FavoritesScreen> createState() => _FavoritesScreenState();
+}
+
+class _FavoritesScreenState extends State<FavoritesScreen> {
+  @override
+  void initState() {
+    super.initState();
+    widget.appState.addListener(_handleStateChange);
+  }
+
+  void _handleStateChange() => setState(() {});
+
+  @override
+  void dispose() {
+    widget.appState.removeListener(_handleStateChange);
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -304,18 +443,7 @@ class FavoritesScreen extends StatelessWidget {
         ? AppThemes.darkFavoritesGradient
         : AppThemes.lightFavoritesGradient;
 
-    // Mock favorites (replace with real state management)
-    final favorites = [
-      {
-        'quote':
-            "The only way to do great work is to love what you do.",
-        'author': "Steve Jobs"
-      },
-      {
-        'quote': "What you get by achieving your goals is not as important as what you become by achieving your goals.",
-        'author': "Zig Ziglar"
-      }
-    ];
+    final favorites = widget.appState.favorites;
 
     return Scaffold(
       extendBodyBehindAppBar: true,
@@ -331,42 +459,60 @@ class FavoritesScreen extends StatelessWidget {
       body: Container(
         width: double.infinity,
         decoration: BoxDecoration(gradient: gradient),
-        child: ListView.builder(
-          padding: const EdgeInsets.symmetric(vertical: 24),
-          itemCount: favorites.length,
-          itemBuilder: (context, idx) {
-            final q = favorites[idx];
-            final cardGradient =
-                isDark ? AppThemes.darkCardGradient : AppThemes.lightCardGradient;
-            return Container(
-              margin: const EdgeInsets.symmetric(horizontal: 24, vertical: 10),
-              decoration: BoxDecoration(
-                gradient: cardGradient,
-                borderRadius: BorderRadius.circular(18),
+        child: favorites.isEmpty
+            ? Center(
+                child: Text('No favorites yet!',
+                    style: Theme.of(context)
+                        .textTheme
+                        .titleMedium!
+                        .copyWith(color: Theme.of(context).colorScheme.secondary)),
+              )
+            : ListView.builder(
+                padding: const EdgeInsets.symmetric(vertical: 24),
+                itemCount: favorites.length,
+                itemBuilder: (context, idx) {
+                  final q = favorites[idx];
+                  final cardGradient = isDark
+                      ? AppThemes.darkCardGradient
+                      : AppThemes.lightCardGradient;
+                  return Container(
+                    margin: const EdgeInsets.symmetric(horizontal: 24, vertical: 10),
+                    decoration: BoxDecoration(
+                      gradient: cardGradient,
+                      borderRadius: BorderRadius.circular(18),
+                    ),
+                    child: ListTile(
+                      contentPadding:
+                          const EdgeInsets.symmetric(vertical: 18, horizontal: 22),
+                      leading: Icon(Icons.star,
+                          color: Theme.of(context).colorScheme.tertiary, size: 30),
+                      title: Text(
+                        q.text,
+                        style: Theme.of(context).textTheme.bodyLarge!.copyWith(
+                            fontWeight: FontWeight.w600),
+                      ),
+                      subtitle: Text(
+                        "- ${q.author}",
+                        style: Theme.of(context).textTheme.bodyMedium!.copyWith(
+                            color: Theme.of(context).colorScheme.secondary),
+                      ),
+                      trailing: IconButton(
+                        icon: Icon(Icons.delete_outline,
+                            color: Theme.of(context).colorScheme.secondary),
+                        tooltip: "Remove from favorites",
+                        onPressed: () {
+                          setState(() {
+                            widget.appState.favorites.removeAt(idx);
+                            widget.appState.repo
+                                .saveFavorites(widget.appState.favorites);
+                            widget.appState.notifyListeners();
+                          });
+                        },
+                      ),
+                    ),
+                  );
+                },
               ),
-              child: ListTile(
-                contentPadding:
-                    const EdgeInsets.symmetric(vertical: 18, horizontal: 22),
-                leading: Icon(Icons.star,
-                    color: Theme.of(context).colorScheme.tertiary, size: 30),
-                title: Text(
-                  q['quote']!,
-                  style: Theme.of(context)
-                      .textTheme
-                      .bodyLarge!
-                      .copyWith(fontWeight: FontWeight.w600),
-                ),
-                subtitle: Text(
-                  "- ${q['author']!}",
-                  style: Theme.of(context)
-                      .textTheme
-                      .bodyMedium!
-                      .copyWith(color: Theme.of(context).colorScheme.secondary),
-                ),
-              ),
-            );
-          },
-        ),
       ),
     );
   }
