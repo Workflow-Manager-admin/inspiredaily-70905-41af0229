@@ -1,557 +1,371 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
-import 'package:shared_preferences/shared_preferences.dart';
-import 'dart:convert';
-import 'dart:async';
-import 'package:http/http.dart' as http;
 
 // PUBLIC_INTERFACE
 void main() {
-  runApp(const InspireDailyApp());
+  runApp(const MyApp());
 }
 
-/// This is the main application widget, managing theme and routes.
-class InspireDailyApp extends StatefulWidget {
-  // PUBLIC_INTERFACE
-  const InspireDailyApp({super.key});
+// PUBLIC_INTERFACE
+class MyApp extends StatefulWidget {
+  const MyApp({super.key});
 
   @override
-  State<InspireDailyApp> createState() => _InspireDailyAppState();
+  State<MyApp> createState() => _MyAppState();
 }
 
-class _InspireDailyAppState extends State<InspireDailyApp> {
+class _MyAppState extends State<MyApp> {
   ThemeMode _themeMode = ThemeMode.light;
 
-  @override
-  void initState() {
-    super.initState();
-    _loadThemeMode();
-  }
-
-  Future<void> _loadThemeMode() async {
-    final prefs = await SharedPreferences.getInstance();
-    final isDark = prefs.getBool('isDarkTheme') ?? false;
+  void _toggleTheme() {
     setState(() {
-      _themeMode = isDark ? ThemeMode.dark : ThemeMode.light;
-    });
-  }
-
-  Future<void> _toggleTheme() async {
-    final isDark = _themeMode == ThemeMode.dark;
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool('isDarkTheme', !isDark);
-    setState(() {
-      _themeMode = !isDark ? ThemeMode.dark : ThemeMode.light;
+      _themeMode =
+          _themeMode == ThemeMode.light ? ThemeMode.dark : ThemeMode.light;
     });
   }
 
   @override
   Widget build(BuildContext context) {
-    // System UI setup for immersive feel
-    SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
-      statusBarColor: Colors.transparent,
-    ));
-
     return MaterialApp(
       title: 'InspireDaily',
-      debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        brightness: Brightness.light,
-        primaryColor: const Color(0xff00b3ff),
-        scaffoldBackgroundColor: const Color(0xffffffff),
-        cardColor: Colors.white,
-        appBarTheme: const AppBarTheme(
-          elevation: 0,
-          backgroundColor: Colors.white,
-          iconTheme: IconThemeData(color: Color(0xff00b3ff)),
-          titleTextStyle: TextStyle(
-            color: Color(0xff00b3ff),
-            fontWeight: FontWeight.bold,
-            fontSize: 22,
-          ),
-        ),
-        floatingActionButtonTheme: const FloatingActionButtonThemeData(
-          backgroundColor: Color(0xff00b3ff),
-        ),
-        colorScheme: ColorScheme.light(
-          secondary: const Color(0xfffa0057),
-          primary: const Color(0xff00b3ff),
-        ),
-        textTheme: const TextTheme(
-          bodyLarge: TextStyle(color: Colors.black, fontSize: 18),
-          bodyMedium: TextStyle(color: Colors.black87, fontSize: 16),
-        ),
-      ),
-      darkTheme: ThemeData(
-        brightness: Brightness.dark,
-        primaryColor: const Color(0xff00b3ff),
-        scaffoldBackgroundColor: const Color(0xFF181822),
-        cardColor: const Color(0xFF23232d),
-        appBarTheme: const AppBarTheme(
-          elevation: 0,
-          backgroundColor: Color(0xFF181822),
-          iconTheme: IconThemeData(color: Color(0xff00b3ff)),
-          titleTextStyle: TextStyle(
-            color: Color(0xff00b3ff),
-            fontWeight: FontWeight.bold,
-            fontSize: 22,
-          ),
-        ),
-        floatingActionButtonTheme: const FloatingActionButtonThemeData(
-          backgroundColor: Color(0xff00b3ff),
-        ),
-        colorScheme: const ColorScheme.dark(
-          secondary: Color(0xfffa0057),
-          primary: Color(0xff00b3ff),
-        ),
-        textTheme: const TextTheme(
-          bodyLarge: TextStyle(color: Colors.white, fontSize: 18),
-          bodyMedium: TextStyle(color: Colors.white70, fontSize: 16),
-        ),
-      ),
+      theme: AppThemes.lightTheme,
+      darkTheme: AppThemes.darkTheme,
       themeMode: _themeMode,
-      routes: {
-        '/': (context) => HomeScreen(toggleTheme: _toggleTheme, themeMode: _themeMode),
-        '/favorites': (context) => FavoritesScreen(toggleTheme: _toggleTheme, themeMode: _themeMode),
-      },
+      home: HomeScreen(
+        onToggleTheme: _toggleTheme,
+        themeMode: _themeMode,
+      ),
     );
   }
 }
 
-/// Model representing a Quote.
-class Quote {
-  final String text;
-  final String author;
-  final String id;
+// Theme and Gradient Definitions
+class AppThemes {
+  // Gradients for Light Theme
+  static const LinearGradient lightBackgroundGradient = LinearGradient(
+    colors: [Color(0xFFB2FEFA), Color(0xFF0ED2F7)],
+    begin: Alignment.topLeft,
+    end: Alignment.bottomRight,
+  );
+  static const LinearGradient lightAppBarGradient = LinearGradient(
+    colors: [Color(0xFF352384), Color(0xFF6B8DD6)],
+    begin: Alignment.topLeft,
+    end: Alignment.bottomRight,
+  );
+  static const LinearGradient lightCardGradient = LinearGradient(
+    colors: [Color(0xFFFBC2EB), Color(0xFFA6C1EE)],
+    begin: Alignment.topCenter,
+    end: Alignment.bottomCenter,
+  );
+  static const LinearGradient lightFavoritesGradient = LinearGradient(
+    colors: [Color(0xFFFFDEE9), Color(0xFFB5FFFC)],
+    begin: Alignment.topLeft,
+    end: Alignment.bottomRight,
+  );
 
-  // PUBLIC_INTERFACE
-  Quote({required this.text, required this.author, required this.id});
+  // Gradients for Dark Theme
+  static const LinearGradient darkBackgroundGradient = LinearGradient(
+    colors: [Color(0xFF0F2027), Color(0xFF2C5364)],
+    begin: Alignment.topLeft,
+    end: Alignment.bottomRight,
+  );
+  static const LinearGradient darkAppBarGradient = LinearGradient(
+    colors: [Color(0xFF232526), Color(0xFF414345)],
+    begin: Alignment.topLeft,
+    end: Alignment.bottomRight,
+  );
+  static const LinearGradient darkCardGradient = LinearGradient(
+    colors: [Color(0xFF434343), Color(0xFF000000)],
+    begin: Alignment.topCenter,
+    end: Alignment.bottomCenter,
+  );
+  static const LinearGradient darkFavoritesGradient = LinearGradient(
+    colors: [Color(0xFF232526), Color(0xFF414345)],
+    begin: Alignment.topLeft,
+    end: Alignment.bottomRight,
+  );
 
-  // Factory constructor to create a Quote from JSON, handling API formats.
-  factory Quote.fromJson(Map<String, dynamic> json) {
-    // For API: https://api.quotable.io/random
-    return Quote(
-      text: json['content'] ?? json['text'] ?? '',
-      author: json['author'] ?? 'Unknown',
-      id: json['_id'] ?? (json['id'] ?? DateTime.now().toIso8601String()),
-    );
-  }
-
-  // Convert Quote to JSON (for local storage)
-  Map<String, dynamic> toJson() => {
-        'text': text,
-        'author': author,
-        'id': id,
-      };
-
-  // PUBLIC_INTERFACE
-  // Compare quotes by id
-  @override
-  bool operator ==(Object other) =>
-      identical(this, other) ||
-      (other is Quote && text == other.text && author == other.author && id == other.id);
-
-  @override
-  int get hashCode => text.hashCode ^ author.hashCode ^ id.hashCode;
+  static final ThemeData lightTheme = ThemeData(
+    brightness: Brightness.light,
+    colorScheme: ColorScheme.fromSeed(
+      seedColor: const Color(0xFF00b3ff),
+      brightness: Brightness.light,
+      primary: Colors.white,
+      secondary: const Color(0xFF00b3ff),
+      tertiary: const Color(0xFFfa0057),
+    ),
+    scaffoldBackgroundColor: Colors.transparent,
+    appBarTheme: const AppBarTheme(
+      backgroundColor: Colors.transparent,
+      foregroundColor: Colors.black,
+      elevation: 0,
+    ),
+    cardTheme: CardTheme(
+      color: Colors.transparent,
+      elevation: 4,
+      margin: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.only(
+          topLeft: Radius.circular(22),
+          topRight: Radius.circular(22),
+          bottomLeft: Radius.circular(22),
+          bottomRight: Radius.circular(22),
+        ),
+      ),
+    ),
+    useMaterial3: true,
+  );
+  static final ThemeData darkTheme = ThemeData(
+    brightness: Brightness.dark,
+    colorScheme: ColorScheme.fromSeed(
+      seedColor: const Color(0xFF00b3ff),
+      brightness: Brightness.dark,
+      primary: const Color(0xFF121212),
+      secondary: const Color(0xFF00b3ff),
+      tertiary: const Color(0xFFfa0057),
+    ),
+    scaffoldBackgroundColor: Colors.transparent,
+    appBarTheme: const AppBarTheme(
+      backgroundColor: Colors.transparent,
+      foregroundColor: Colors.white,
+      elevation: 0,
+    ),
+    cardTheme: CardTheme(
+      color: Colors.transparent,
+      elevation: 4,
+      margin: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.only(
+          topLeft: Radius.circular(22),
+          topRight: Radius.circular(22),
+          bottomLeft: Radius.circular(22),
+          bottomRight: Radius.circular(22),
+        ),
+      ),
+    ),
+    useMaterial3: true,
+  );
 }
 
-/// Service to fetch quotes from the public API.
-/// Uses: https://api.quotable.io/random
-class QuoteService {
-  static const _apiUrl = 'https://api.quotable.io/random';
-
-  // PUBLIC_INTERFACE
-  static Future<Quote?> fetchQuoteOfTheDay() async {
-    try {
-      final response = await http.get(Uri.parse(_apiUrl));
-      if (response.statusCode == 200) {
-        final Map<String, dynamic> data = json.decode(response.body);
-        return Quote.fromJson(data);
-      }
-    } catch (e) {
-      // Fail silently and return null
-    }
-    return null;
-  }
-}
-
-/// Manages local storage for favorited quotes.
-class FavoritesManager {
-  static const _favoritesKey = 'favorite_quotes';
-
-  // PUBLIC_INTERFACE
-  static Future<List<Quote>> getFavorites() async {
-    final prefs = await SharedPreferences.getInstance();
-    final String? jsonString = prefs.getString(_favoritesKey);
-    if (jsonString == null) return [];
-    final List decoded = json.decode(jsonString);
-    return decoded.map((item) => Quote.fromJson(item)).toList().cast<Quote>();
-  }
-
-  // PUBLIC_INTERFACE
-  static Future<void> saveFavorites(List<Quote> quotes) async {
-    final prefs = await SharedPreferences.getInstance();
-    final List<Map<String, dynamic>> jsonList = quotes.map((q) => q.toJson()).toList();
-    final jsonString = json.encode(jsonList);
-    await prefs.setString(_favoritesKey, jsonString);
-  }
-
-  // PUBLIC_INTERFACE
-  static Future<void> addFavorite(Quote quote) async {
-    final favorites = await getFavorites();
-    if (!favorites.contains(quote)) {
-      favorites.add(quote);
-      await saveFavorites(favorites);
-    }
-  }
-
-  // PUBLIC_INTERFACE
-  static Future<void> removeFavorite(Quote quote) async {
-    final favorites = await getFavorites();
-    favorites.removeWhere((q) => q.id == quote.id);
-    await saveFavorites(favorites);
-  }
-
-  // PUBLIC_INTERFACE
-  static Future<bool> isFavorite(Quote quote) async {
-    final favorites = await getFavorites();
-    return favorites.any((q) => q.id == quote.id);
-  }
-}
-
-/// HomeScreen - displays daily quote and navigation.
-class HomeScreen extends StatefulWidget {
-  final Future<void> Function() toggleTheme;
+// HomeScreen with toggle for light/dark mode and navigation to Favorites
+class HomeScreen extends StatelessWidget {
+  final VoidCallback onToggleTheme;
   final ThemeMode themeMode;
 
-  // PUBLIC_INTERFACE
-  const HomeScreen({required this.toggleTheme, required this.themeMode, super.key});
-
-  @override
-  State<HomeScreen> createState() => _HomeScreenState();
-}
-
-/// State for HomeScreen, fetches daily quote and manages favorite status.
-class _HomeScreenState extends State<HomeScreen> {
-  Future<Quote?>? _quoteFuture;
-  bool _isFavorite = false;
-  Quote? _currentQuote;
-
-  @override
-  void initState() {
-    super.initState();
-    _fetchQuote();
-  }
-
-  void _fetchQuote() {
-    setState(() {
-      _quoteFuture = QuoteService.fetchQuoteOfTheDay();
-    });
-    _quoteFuture?.then((quote) async {
-      _currentQuote = quote;
-      if (quote != null) {
-        final fav = await FavoritesManager.isFavorite(quote);
-        setState(() {
-          _isFavorite = fav;
-        });
-      }
-    });
-  }
-
-  Future<void> _toggleFavorite() async {
-    if (_currentQuote == null) return;
-    if (_isFavorite) {
-      await FavoritesManager.removeFavorite(_currentQuote!);
-    } else {
-      await FavoritesManager.addFavorite(_currentQuote!);
-    }
-    final fav = await FavoritesManager.isFavorite(_currentQuote!);
-    setState(() {
-      _isFavorite = fav;
-    });
-  }
+  const HomeScreen({
+    super.key,
+    required this.onToggleTheme,
+    required this.themeMode,
+  });
 
   @override
   Widget build(BuildContext context) {
+    final bool isDark = Theme.of(context).brightness == Brightness.dark;
+    final backgroundGradient = isDark
+        ? AppThemes.darkBackgroundGradient
+        : AppThemes.lightBackgroundGradient;
+    final appBarGradient =
+        isDark ? AppThemes.darkAppBarGradient : AppThemes.lightAppBarGradient;
+
     return Scaffold(
-      appBar: InspireAppBar(
-        title: 'InspireDaily',
-        actions: [
-          IconButton(
-            icon: Icon(widget.themeMode == ThemeMode.light ? Icons.dark_mode : Icons.light_mode),
-            tooltip: 'Toggle Light/Dark Mode',
-            onPressed: widget.toggleTheme,
-          ),
-        ],
-      ),
-      body: Center(
-        child: FutureBuilder<Quote?>(
-          future: _quoteFuture,
-          builder: (context, snapshot) {
-            if (snapshot.connectionState == ConnectionState.waiting) {
-              return CircularProgressIndicator(
-                color: Theme.of(context).colorScheme.secondary,
-              );
-            }
-            if (snapshot.hasError || !snapshot.hasData || snapshot.data == null) {
-              return QuoteCard(
-                quote: Quote(
-                  text: 'Unable to fetch quote for today.\nPlease check your connection and try again.',
-                  author: 'InspireDaily',
-                  id: 'error',
-                ),
-                isFavorite: false,
-                onFavorite: null,
-              );
-            }
-            final quote = snapshot.data!;
-            return QuoteCard(
-              quote: quote,
-              isFavorite: _isFavorite,
-              onFavorite: _toggleFavorite,
-            );
-          },
-        ),
-      ),
-      bottomNavigationBar: InspireBottomNavBar(
-        currentIndex: 0,
-        onTabSelected: (idx) {
-          if (idx == 1) Navigator.pushReplacementNamed(context, '/favorites');
-        },
-      ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () {
-          _fetchQuote();
-        },
-        tooltip: "Refresh Quote",
-        child: const Icon(Icons.refresh, color: Colors.white),
-      ),
-      floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
-    );
-  }
-}
-
-/// QuoteCard - Stylized card for displaying a quote, author, and favorite button.
-class QuoteCard extends StatelessWidget {
-  final Quote quote;
-  final bool isFavorite;
-  final VoidCallback? onFavorite;
-
-  // PUBLIC_INTERFACE
-  const QuoteCard({required this.quote, required this.isFavorite, this.onFavorite, super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final accent = theme.colorScheme.secondary;
-    final secondary = theme.primaryColor;
-
-    return Card(
-      color: theme.cardColor,
-      margin: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-      elevation: 5,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 30.0),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(Icons.format_quote, size: 36, color: accent),
-            const SizedBox(height: 10),
-            Text(
-              '"${quote.text}"',
-              style: theme.textTheme.bodyLarge?.copyWith(fontStyle: FontStyle.italic, fontWeight: FontWeight.w500, fontSize: 21),
-              textAlign: TextAlign.center,
+      extendBodyBehindAppBar: true,
+      appBar: PreferredSize(
+        preferredSize: const Size.fromHeight(56),
+        child: AppBar(
+          flexibleSpace: Container(
+            decoration: BoxDecoration(
+              gradient: appBarGradient,
             ),
-            const SizedBox(height: 15),
-            Align(
-              alignment: Alignment.centerRight,
-              child: Text(
-                '- ${quote.author}',
-                style: theme.textTheme.bodyMedium?.copyWith(
-                  fontWeight: FontWeight.w500,
-                  color: secondary,
-                  fontSize: 16,
-                ),
-                textAlign: TextAlign.end,
-              ),
-            ),
-            const SizedBox(height: 16),
-            if (onFavorite != null)
-              IconButton(
-                icon: Icon(
-                  isFavorite ? Icons.favorite : Icons.favorite_border,
-                  color: accent,
-                  size: 28,
-                ),
-                tooltip: isFavorite ? 'Remove from Favorites' : 'Mark as Favorite',
-                onPressed: onFavorite,
-              ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-/// FavoritesScreen - shows all favorited quotes in a ListView.
-class FavoritesScreen extends StatefulWidget {
-  final Future<void> Function() toggleTheme;
-  final ThemeMode themeMode;
-
-  // PUBLIC_INTERFACE
-  const FavoritesScreen({required this.toggleTheme, required this.themeMode, super.key});
-
-  @override
-  State<FavoritesScreen> createState() => _FavoritesScreenState();
-}
-
-class _FavoritesScreenState extends State<FavoritesScreen> {
-  List<Quote> _favorites = [];
-
-  @override
-  void initState() {
-    super.initState();
-    _loadFavorites();
-  }
-
-  Future<void> _loadFavorites() async {
-    final favorites = await FavoritesManager.getFavorites();
-    setState(() {
-      _favorites = favorites;
-    });
-  }
-
-  Future<void> _removeFavorite(Quote quote) async {
-    await FavoritesManager.removeFavorite(quote);
-    await _loadFavorites();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: InspireAppBar(
-        title: 'My Favorites',
-        actions: [
-          IconButton(
-            icon: Icon(widget.themeMode == ThemeMode.light ? Icons.dark_mode : Icons.light_mode),
-            tooltip: 'Toggle Light/Dark Mode',
-            onPressed: widget.toggleTheme,
           ),
-        ],
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () => Navigator.pushReplacementNamed(context, '/'),
-        ),
-      ),
-      body: _favorites.isEmpty
-          ? Center(
-              child: Text(
-                'No favorite quotes yet.\nStart adding some for daily inspiration!',
-                style: Theme.of(context).textTheme.bodyLarge,
-                textAlign: TextAlign.center,
-              ),
-            )
-          : ListView.builder(
-              itemCount: _favorites.length,
-              itemBuilder: (context, idx) {
-                final quote = _favorites[idx];
-                return Dismissible(
-                  key: ValueKey(quote.id),
-                  background: Container(
-                    color: Theme.of(context).colorScheme.secondary.withAlpha((0.8 * 255).toInt()),
-                    alignment: Alignment.centerRight,
-                    padding: const EdgeInsets.only(right: 32),
-                    child: const Icon(Icons.delete, color: Colors.white),
-                  ),
-                  direction: DismissDirection.endToStart,
-                  onDismissed: (direction) {
-                    _removeFavorite(quote);
-                  },
-                  child: QuoteCard(
-                    quote: quote,
-                    isFavorite: true,
-                    onFavorite: () => _removeFavorite(quote),
+          title: const Text('InspireDaily'),
+          actions: [
+            IconButton(
+              icon: Icon(isDark ? Icons.light_mode : Icons.dark_mode),
+              tooltip: "Toggle theme",
+              onPressed: onToggleTheme,
+            ),
+            IconButton(
+              icon: const Icon(Icons.favorite),
+              tooltip: 'Favorites',
+              onPressed: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) =>
+                        FavoritesScreen(),
                   ),
                 );
               },
             ),
-      bottomNavigationBar: InspireBottomNavBar(
-        currentIndex: 1,
-        onTabSelected: (idx) {
-          if (idx == 0) Navigator.pushReplacementNamed(context, '/');
-        },
-      ),
-    );
-  }
-}
-
-/// App bar with minimal modern style.
-class InspireAppBar extends StatelessWidget implements PreferredSizeWidget {
-  final String title;
-  final List<Widget>? actions;
-  final Widget? leading;
-
-  // PUBLIC_INTERFACE
-  const InspireAppBar({required this.title, this.actions, this.leading, super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return AppBar(
-      title: Text(title, style: Theme.of(context).appBarTheme.titleTextStyle),
-      centerTitle: true,
-      leading: leading,
-      actions: actions,
-      backgroundColor: Theme.of(context).appBarTheme.backgroundColor,
-      elevation: 0,
-    );
-  }
-
-  @override
-  Size get preferredSize => const Size.fromHeight(56.0);
-}
-
-/// Bottom nav bar for Home and Favorites
-class InspireBottomNavBar extends StatelessWidget {
-  final int currentIndex;
-  final Function(int) onTabSelected;
-
-  // PUBLIC_INTERFACE
-  const InspireBottomNavBar({required this.currentIndex, required this.onTabSelected, super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return BottomAppBar(
-      shape: const CircularNotchedRectangle(),
-      notchMargin: 8,
-      color: Theme.of(context).cardColor,
-      child: SizedBox(
-        height: 56,
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceAround,
-          children: [
-            _buildTabItem(context, icon: Icons.home, label: "Home", index: 0),
-            _buildTabItem(context, icon: Icons.favorite, label: "Favorites", index: 1),
           ],
+        ),
+      ),
+      body: Container(
+        width: double.infinity,
+        height: double.infinity,
+        decoration: BoxDecoration(gradient: backgroundGradient),
+        child: Center(
+          child: QuoteCard(isDark: isDark),
         ),
       ),
     );
   }
+}
 
-  Widget _buildTabItem(BuildContext context, {required IconData icon, required String label, required int index}) {
-    final color = currentIndex == index ? Theme.of(context).colorScheme.secondary : Colors.grey;
-    return InkWell(
-      onTap: () => onTabSelected(index),
-      borderRadius: BorderRadius.circular(40),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 9),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon, color: color),
-            const SizedBox(height: 2),
-            Text(label, style: TextStyle(color: color, fontSize: 13, fontWeight: FontWeight.w500)),
-          ],
+// Widget for displaying quote in a gradient card
+class QuoteCard extends StatelessWidget {
+  final bool isDark;
+  const QuoteCard({super.key, required this.isDark});
+
+  @override
+  Widget build(BuildContext context) {
+    final gradient =
+        isDark ? AppThemes.darkCardGradient : AppThemes.lightCardGradient;
+
+    // Mock quote and author (replace with live data in production)
+    const quote =
+        "Success is not final, failure is not fatal: It is the courage to continue that counts.";
+    const author = "Winston Churchill";
+
+    return Container(
+      width: MediaQuery.of(context).size.width * 0.88,
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        gradient: gradient,
+        borderRadius: BorderRadius.circular(22),
+        boxShadow: [
+          BoxShadow(
+            color: isDark
+                ? Color(0x80000000) // semi-transparent black (~0.5 opacity)
+                : Color(0x4D9E9E9E), // semi-transparent grey (~0.3 opacity)
+            blurRadius: 18,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            Icons.format_quote,
+            size: 36,
+            color: Theme.of(context).colorScheme.tertiary,
+          ),
+          const SizedBox(height: 10),
+          Text(
+            quote,
+            style: Theme.of(context)
+                .textTheme
+                .titleLarge!
+                .copyWith(fontWeight: FontWeight.w600, height: 1.4),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 12),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.end,
+            children: [
+              Text(
+                "- $author",
+                style: Theme.of(context)
+                    .textTheme
+                    .bodyMedium!
+                    .copyWith(color: Theme.of(context).colorScheme.secondary),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.end,
+            children: [
+              IconButton(
+                icon: Icon(Icons.favorite_border,
+                    color: Theme.of(context).colorScheme.tertiary),
+                tooltip: "Favorite",
+                onPressed: () {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text("Quote added to favorites!")),
+                  );
+                },
+              ),
+            ],
+          )
+        ],
+      ),
+    );
+  }
+}
+
+// Favorites screen with themed gradient background
+class FavoritesScreen extends StatelessWidget {
+  const FavoritesScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final gradient = isDark
+        ? AppThemes.darkFavoritesGradient
+        : AppThemes.lightFavoritesGradient;
+
+    // Mock favorites (replace with real state management)
+    final favorites = [
+      {
+        'quote':
+            "The only way to do great work is to love what you do.",
+        'author': "Steve Jobs"
+      },
+      {
+        'quote': "What you get by achieving your goals is not as important as what you become by achieving your goals.",
+        'author': "Zig Ziglar"
+      }
+    ];
+
+    return Scaffold(
+      extendBodyBehindAppBar: true,
+      appBar: PreferredSize(
+        preferredSize: const Size.fromHeight(56),
+        child: AppBar(
+          flexibleSpace: Container(
+            decoration: BoxDecoration(gradient: gradient),
+          ),
+          title: const Text('Favorites'),
+        ),
+      ),
+      body: Container(
+        width: double.infinity,
+        decoration: BoxDecoration(gradient: gradient),
+        child: ListView.builder(
+          padding: const EdgeInsets.symmetric(vertical: 24),
+          itemCount: favorites.length,
+          itemBuilder: (context, idx) {
+            final q = favorites[idx];
+            final cardGradient =
+                isDark ? AppThemes.darkCardGradient : AppThemes.lightCardGradient;
+            return Container(
+              margin: const EdgeInsets.symmetric(horizontal: 24, vertical: 10),
+              decoration: BoxDecoration(
+                gradient: cardGradient,
+                borderRadius: BorderRadius.circular(18),
+              ),
+              child: ListTile(
+                contentPadding:
+                    const EdgeInsets.symmetric(vertical: 18, horizontal: 22),
+                leading: Icon(Icons.star,
+                    color: Theme.of(context).colorScheme.tertiary, size: 30),
+                title: Text(
+                  q['quote']!,
+                  style: Theme.of(context)
+                      .textTheme
+                      .bodyLarge!
+                      .copyWith(fontWeight: FontWeight.w600),
+                ),
+                subtitle: Text(
+                  "- ${q['author']!}",
+                  style: Theme.of(context)
+                      .textTheme
+                      .bodyMedium!
+                      .copyWith(color: Theme.of(context).colorScheme.secondary),
+                ),
+              ),
+            );
+          },
         ),
       ),
     );
